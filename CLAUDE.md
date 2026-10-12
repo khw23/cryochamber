@@ -7,6 +7,18 @@ For project overview and usage, see `README.md`.
 
 ## Build & Test
 
+### Research fork contract
+
+See `templates/protocol.md` and `docs/src/explanation/research-notifications.md`.
+The default upstream reporting/TODO contract remains unchanged. With opt-in
+`research_notifications`, clean unchanged wakes may be silent and idle without
+a TODO; real failure and claimed-human-message fallback guarantees remain.
+`progress` is rate-limited agent-authored synthesis, not an LLM summarizer.
+`pause` stops dispatch without declaring research complete; claimed unfinished
+TODOs get fresh pending identities before shutdown. IPC v11 requires matching
+daemon and agent binaries. These explicit exceptions supersede unconditional
+per-wake-message/TODO statements elsewhere in this maintainer document.
+
 ```bash
 cargo build                          # build
 cargo test                           # run all tests

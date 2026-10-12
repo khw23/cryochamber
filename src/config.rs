@@ -26,6 +26,13 @@ pub struct ProviderConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CryoConfig {
+    /// Opt in to successful silent wakes and event-only idle without a TODO.
+    #[serde(default)]
+    pub research_notifications: bool,
+
+    /// Minimum interval for `cryo-agent progress`; replies/alerts use `send`.
+    #[serde(default = "default_progress_interval")]
+    pub progress_interval_secs: u64,
     /// Agent command (e.g. "opencode", "claude", "codex", "pi", "kimi")
     #[serde(default = "default_agent")]
     pub agent: String,
@@ -57,6 +64,10 @@ fn default_agent() -> String {
     "opencode".to_string()
 }
 
+fn default_progress_interval() -> u64 {
+    86400
+}
+
 fn default_max_session_duration() -> u64 {
     DEFAULT_MAX_SESSION_DURATION_SECS
 }
@@ -68,6 +79,8 @@ fn default_poll_interval() -> u64 {
 impl Default for CryoConfig {
     fn default() -> Self {
         Self {
+            research_notifications: false,
+            progress_interval_secs: default_progress_interval(),
             agent: default_agent(),
             max_session_duration: default_max_session_duration(),
             watch_dirs: default_watch_dirs(),

@@ -16,6 +16,8 @@ fn test_load_partial_toml() {
     std::fs::write(&path, "agent = \"claude\"\n").unwrap();
     let config = load_config(&path).unwrap().unwrap();
     assert_eq!(config.agent, "claude");
+    assert!(!config.research_notifications);
+    assert_eq!(config.progress_interval_secs, 86400);
     assert_eq!(
         config.max_session_duration, 3600,
         "Should use default timeout"

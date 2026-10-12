@@ -1494,6 +1494,146 @@ fn test_resolve_child_exit_after_hibernate_returns_outcome() {
 }
 
 #[test]
+fn research_profile_quiet_waits_progress_human_replies_and_pause() {
+    use crate::socket::Request;
+    for scenario in [
+        "quiet",
+        "progress",
+        "reply",
+        "unanswered",
+        "crash",
+        "pause",
+        "pause-unread",
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        let config = CryoConfig {
+            research_notifications: true,
+            ..CryoConfig::default()
+        };
+        crate::config::save_config(&crate::config::config_path(dir.path()), &config).unwrap();
+        let now = "2026-10-11T12:00:00".parse().unwrap();
+        let clock = Arc::new(TestClock::new(now));
+        let daemon = Daemon::new_with_clock(dir.path().to_path_buf(), clock.clone());
+        let state = test_cryo_state();
+        let hibernate = || Request::Hibernate {
+            complete: false,
+            exit_code: 0,
+            summary: Some("waiting".into()),
+            linger: Some(0),
+        };
+        let mut effects = FakeSessionEffects::new(); // No pending TODO: research idle is valid.
+        let requests = match scenario {
+            "progress" => vec![
+                Request::Progress {
+                    text: "Scientific interpretation".into(),
+                },
+                Request::Progress {
+                    text: "Later interpretation".into(),
+                },
+                hibernate(),
+            ],
+            "reply" | "unanswered" => {
+                effects.push_inbox_message("human.md", "What does this mean?");
+                let mut requests = vec![
+                    Request::Receive,
+                    Request::Progress {
+                        text: "Not a reply".into(),
+                    },
+                ];
+                if scenario == "reply" {
+                    requests.push(Request::Send {
+                        text: "A direct scientific answer".into(),
+                        question: false,
+                    });
+                }
+                requests.push(hibernate());
+                requests
+            }
+            "crash" => vec![Request::Ping],
+            "pause" => vec![Request::Pause {
+                summary: "repair context".into(),
+            }],
+            "pause-unread" => {
+                effects.push_inbox_message("human.md", "New direction");
+                vec![
+                    Request::Pause {
+                        summary: "blocked".into(),
+                    },
+                    Request::Receive,
+                    Request::Send {
+                        text: "Will review your direction".into(),
+                        question: false,
+                    },
+                    Request::Pause {
+                        summary: "review now".into(),
+                    },
+                ]
+            }
+            _ => vec![hibernate()],
+        };
+        let mut waits: Vec<_> = (0..requests.len() - 1).map(|_| Ok(None)).collect();
+        waits.push(Ok(Some(ChildExitStatus {
+            code: Some(if scenario == "crash" { 1 } else { 0 }),
+        })));
+        let mut runtime =
+            FakeSessionRuntime::new(requests.into_iter().map(|r| Ok(Some(r))).collect(), waits);
+        let outcome = daemon
+            .drive_active_session(
+                &mut runtime,
+                &mut effects,
+                test_session_context(&state, 60, clock.monotonic_now()),
+                begin_test_logger(dir.path()),
+            )
+            .unwrap();
+        match scenario {
+            "quiet" => {
+                assert_eq!(outcome, SessionLoopOutcome::Hibernate);
+                assert!(effects.replies.is_empty());
+            }
+            "progress" => {
+                assert_eq!(effects.replies.len(), 1);
+                assert_eq!(effects.replies[0].1, "Scientific interpretation");
+                let progress = crate::progress::ProgressState::load(
+                    &dir.path().join(".cryo/progress-state.json"),
+                )
+                .unwrap();
+                assert_eq!(progress.pending.as_deref(), Some("Later interpretation"));
+                assert!(runtime.responses()[1].1.contains("NOT sent"));
+            }
+            "reply" => {
+                assert!(!runtime.responses()[1].0);
+                assert_eq!(effects.replies.len(), 1);
+                assert_eq!(effects.replies[0].0, ReplyAuthor::Agent);
+            }
+            "unanswered" => {
+                assert!(!runtime.responses()[1].0);
+                assert_eq!(effects.replies.len(), 1);
+                assert_eq!(effects.replies[0].0, ReplyAuthor::Daemon);
+            }
+            "crash" => {
+                assert!(outcome.is_crash());
+                assert_eq!(effects.replies.len(), 1);
+                assert!(effects.replies[0].1.contains("crash"));
+            }
+            "pause" => {
+                assert_eq!(outcome, SessionLoopOutcome::Paused);
+                assert!(effects.replies.is_empty());
+                assert_eq!(
+                    decide_next_step(SessionRunResult::Outcome(&outcome), Some(now)),
+                    NextStep::Paused
+                );
+            }
+            "pause-unread" => {
+                assert!(!runtime.responses()[0].0);
+                assert_eq!(outcome, SessionLoopOutcome::Paused);
+                assert_eq!(effects.replies.len(), 1);
+            }
+            _ => unreachable!(),
+        }
+    }
+}
+
+#[test]
 fn test_resolve_child_exit_without_hibernate_marks_quick_exit() {
     let quick = resolve_child_exit(None, Duration::from_secs(2), Some(0));
     let slow = resolve_child_exit(None, Duration::from_secs(8), Some(0));

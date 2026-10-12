@@ -11,6 +11,7 @@ pub mod lifecycle;
 pub mod log;
 pub mod message;
 pub mod process;
+pub mod progress;
 pub mod protocol;
 pub mod registry;
 pub mod service;

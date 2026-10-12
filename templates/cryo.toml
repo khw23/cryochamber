@@ -6,6 +6,10 @@ agent = "{{agent}}"
 # Session timeout in seconds (0 = no timeout)
 max_session_duration = 3600
 
+# Opt-in research workflow: quiet successful wakes and idle waits without TODOs.
+# research_notifications = true
+# progress_interval_secs = 86400
+
 # Directories the daemon watches for new files to wake the agent reactively.
 # Paths are interpreted relative to the chamber directory (this directory)
 # unless they are absolute. Set to [] to disable reactive wake entirely.

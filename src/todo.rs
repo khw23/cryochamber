@@ -308,6 +308,26 @@ impl TodoFile {
         })
     }
 
+    /// Pause consumes the attempt, not the scientific task. Preserve its text
+    /// and deadline in a fresh pending item, without a crash/retry suffix.
+    pub fn preserve_claimed_for_resume(&self) -> Result<()> {
+        self.update(|items| {
+            let mut pending = Vec::new();
+            for item in items.iter_mut().filter(|i| i.claimed && !i.done) {
+                let mut next = item.clone();
+                item.done = true;
+                item.claimed = false;
+                next.claimed = false;
+                pending.push(next);
+            }
+            for mut item in pending {
+                item.id = items.iter().map(|i| i.id).max().unwrap_or(0) + 1;
+                items.push(item);
+            }
+            Ok(())
+        })
+    }
+
     pub fn reschedule_claimed_after_crash(&self, now: NaiveDateTime) -> Result<Vec<u32>> {
         self.update(|items| {
             let mut consumed = Vec::new();

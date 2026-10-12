@@ -15,6 +15,7 @@ pub(super) enum SessionRunResult<'a> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum NextStep {
+    Paused,
     PlanComplete,
     Hibernate { next_wake: Option<NaiveDateTime> },
 }
@@ -33,6 +34,7 @@ pub(super) fn decide_next_step(
     next_wake: Option<NaiveDateTime>,
 ) -> NextStep {
     match session_result {
+        SessionRunResult::Outcome(SessionLoopOutcome::Paused) => NextStep::Paused,
         SessionRunResult::Outcome(SessionLoopOutcome::PlanComplete) => NextStep::PlanComplete,
         SessionRunResult::Outcome(SessionLoopOutcome::Hibernate) => {
             NextStep::Hibernate { next_wake }
@@ -56,7 +58,7 @@ pub(super) fn compute_sleep_timeout(
 ) -> Duration {
     let to_duration =
         |dt: NaiveDateTime| -> Duration { (dt - now).to_std().unwrap_or(Duration::ZERO) };
-    match wake_deadline.map(&to_duration) {
+    match wake_deadline.map(to_duration) {
         Some(wake) => wake,
         None => Duration::from_secs(3600),
     }

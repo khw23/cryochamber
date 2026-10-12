@@ -230,7 +230,11 @@ impl SessionLauncher for ProcessSessionLauncher {
             inbox_waiting,
             inbox_sources,
         };
-        let prompt = crate::agent::build_prompt(&agent_config);
+        let mut prompt = crate::agent::build_prompt(&agent_config);
+        prompt.push_str(&format!(
+            "\n## Active notification profile\n\nresearch_notifications = {}\nprogress_interval_secs = {}\n",
+            config.research_notifications, config.progress_interval_secs
+        ));
 
         let mut logger = crate::log::EventLogger::begin(
             &daemon.log_path,

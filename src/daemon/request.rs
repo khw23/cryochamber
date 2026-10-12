@@ -12,6 +12,12 @@ pub(super) enum TodoRequest {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum DaemonRequest {
+    Progress {
+        text: String,
+    },
+    Pause {
+        summary: String,
+    },
     Ping,
     Hello {
         protocol_version: u32,
@@ -36,6 +42,8 @@ pub(super) enum DaemonRequest {
 impl From<crate::socket::Request> for DaemonRequest {
     fn from(request: crate::socket::Request) -> Self {
         match request {
+            crate::socket::Request::Progress { text } => Self::Progress { text },
+            crate::socket::Request::Pause { summary } => Self::Pause { summary },
             crate::socket::Request::Ping => Self::Ping,
             crate::socket::Request::Hello { protocol_version } => Self::Hello { protocol_version },
             crate::socket::Request::Dialog { filter } => Self::Dialog { filter },

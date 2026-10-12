@@ -295,6 +295,35 @@ fn test_todo_file_complete_claimed_marks_claimed_items_done() {
 }
 
 #[test]
+fn research_pause_preserves_unfinished_intent_without_crash_backoff() {
+    let dir = tempfile::tempdir().unwrap();
+    let todos = TodoFile::new(dir.path().join("todo.json"));
+    todos
+        .add("check calculation".into(), "2026-03-02T10:00".into())
+        .unwrap();
+    todos
+        .add("later work".into(), "2026-03-03T10:00".into())
+        .unwrap();
+    todos
+        .claim_due(&"2026-03-02T10:30:00".parse().unwrap())
+        .unwrap();
+    let before = todos.items().unwrap();
+    todos.preserve_claimed_for_resume().unwrap();
+    let after = todos.items().unwrap();
+    assert!(after[0].done);
+    assert!(!after[0].claimed);
+    assert_eq!(after[1].text, before[1].text);
+    assert_eq!(after[1].id, before[1].id);
+    assert!(!after[1].done);
+    assert_eq!(after[2].text, before[0].text);
+    assert_eq!(after[2].at, before[0].at);
+    assert!(!after[2].done && !after[2].claimed);
+    assert_ne!(after[2].id, before[0].id);
+    todos.preserve_claimed_for_resume().unwrap();
+    assert_eq!(todos.items().unwrap().len(), 3);
+}
+
+#[test]
 fn test_todo_file_reschedule_claimed_after_crash_marks_claimed_done_and_adds_retry() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("todo.json");

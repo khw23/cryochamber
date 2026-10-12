@@ -16,6 +16,18 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Rate-limited ordinary progress; use send for human replies or important events
+    Progress {
+        #[arg(required_unless_present = "stdin", conflicts_with = "stdin")]
+        text: Option<String>,
+        #[arg(long)]
+        stdin: bool,
+    },
+    /// Stop dispatch without completing the research; unfinished TODOs survive restart
+    Pause {
+        #[arg(long)]
+        summary: String,
+    },
     /// End session and schedule next wake
     Hibernate {
         /// Mark plan as complete (no more wakes)
@@ -130,6 +142,18 @@ fn main() -> Result<()> {
     }
 
     match cli.command {
+        Commands::Progress { text, stdin } => {
+            let text = if stdin {
+                let mut body = String::new();
+                std::io::stdin().read_to_string(&mut body)?;
+                body
+            } else {
+                text.unwrap_or_default()
+            };
+            anyhow::ensure!(!text.trim().is_empty(), "progress must not be empty");
+            send(&dir, &Request::Progress { text })
+        }
+        Commands::Pause { summary } => send(&dir, &Request::Pause { summary }),
         Commands::Hibernate {
             complete,
             exit,

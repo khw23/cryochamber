@@ -231,6 +231,7 @@ impl InboxWatcher {
 /// What the daemon should do after a session completes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SessionLoopOutcome {
+    Paused,
     PlanComplete,
     Hibernate,
     ValidationFailed { quick_exit: bool, retryable: bool },
@@ -746,6 +747,12 @@ pub struct Daemon {
 }
 
 impl Daemon {
+    fn research_notifications(&self) -> bool {
+        crate::config::load_config(&crate::config::config_path(&self.dir))
+            .ok()
+            .flatten()
+            .is_some_and(|config| config.research_notifications)
+    }
     pub fn new(dir: PathBuf) -> Self {
         Self::with_deps(
             dir,
@@ -917,7 +924,10 @@ impl Daemon {
                             .into(),
                 });
             }
-            DaemonRequest::Send { .. } | DaemonRequest::Hibernate { .. } => {
+            DaemonRequest::Send { .. }
+            | DaemonRequest::Hibernate { .. }
+            | DaemonRequest::Progress { .. }
+            | DaemonRequest::Pause { .. } => {
                 let _ = responder.respond(&crate::socket::Response {
                     ok: false,
                     message:
@@ -961,6 +971,10 @@ impl Daemon {
         state: EventLoopMutations<'_>,
     ) -> Result<LoopControl> {
         match step {
+            NextStep::Paused => {
+                eprintln!("Daemon: research paused; TODOs preserved. Repair then explicitly restart the chamber.");
+                Ok(LoopControl::Break)
+            }
             NextStep::PlanComplete => {
                 eprintln!("Daemon: plan complete. Shutting down.");
                 Ok(LoopControl::Break)
@@ -1266,7 +1280,10 @@ impl Daemon {
                             // Single source of truth: outcome decides crash-status.
                             cryo_state.previous_session_crashed = outcome.is_crash();
                             cryo_state.session_active = false;
-                            if outcome.is_crash() {
+                            if outcome == SessionLoopOutcome::Paused {
+                                crate::todo::TodoFile::new(self.dir.join("todo.json"))
+                                    .preserve_claimed_for_resume()?;
+                            } else if outcome.is_crash() {
                                 self.reschedule_claimed_after_crash();
                             } else {
                                 self.complete_claimed_todos();
@@ -1391,6 +1408,46 @@ impl Daemon {
         state: ActiveRequestState<'_>,
     ) -> Result<()> {
         match DaemonRequest::from(request) {
+            DaemonRequest::Pause { summary } => {
+                if state.wait.parked_deadline.is_some() || effects.has_unread_inbox() {
+                    runtime.respond(false, "Pause refused: finish the pending hibernate or receive and answer new mail first.".into())?;
+                } else {
+                    state
+                        .logger
+                        .log_event(&format!("research paused: {summary}"))?;
+                    *state.hibernate_outcome = Some(SessionLoopOutcome::Paused);
+                    runtime.respond(true, "Dispatch will stop when this process exits; research is NOT complete. Restart explicitly after repair.".into())?;
+                }
+            }
+            DaemonRequest::Progress { text } => {
+                // A claimed human message is never rate limited or marked answered
+                // by a suppressed progress update: make the agent use `send`.
+                if state.inbox_state.has_claimed_batch() {
+                    runtime.respond(
+                        false,
+                        "Answer the received human message with send; progress is not a reply."
+                            .into(),
+                    )?;
+                } else {
+                    let config =
+                        crate::config::load_config(&crate::config::config_path(&self.dir))?
+                            .unwrap_or_default();
+                    let path = self.dir.join(".cryo/progress-state.json");
+                    let mut progress = crate::progress::ProgressState::load(&path)?;
+                    let now = self.clock.local_now();
+                    if progress.due(now, config.progress_interval_secs, &text) {
+                        effects.write_reply(ReplyAuthor::Agent, &text, now, false)?;
+                        state.inbox_state.record_status_send();
+                        progress.delivered(now, text);
+                        progress.save(&path)?;
+                        runtime.respond(true, "Progress sent".into())?;
+                    } else {
+                        progress.pending = Some(text);
+                        progress.save(&path)?;
+                        runtime.respond(true, "Progress NOT sent: coalesced locally. Revise your synthesis and call progress after the interval; no timer was created.".into())?;
+                    }
+                }
+            }
             DaemonRequest::Ping => {
                 runtime.respond(true, "pong".into())?;
             }
@@ -1464,7 +1521,8 @@ impl Daemon {
                     complete,
                     exit_code,
                     summary.as_deref(),
-                    effects.has_pending_todo_with_valid_wake(),
+                    // Research mode permits waiting for human mail without a dummy TODO.
+                    effects.has_pending_todo_with_valid_wake() || self.research_notifications(),
                     effects.has_unread_inbox(),
                     has_due_todo,
                 );
@@ -1810,7 +1868,12 @@ impl Daemon {
                             .unwrap_or_else(|| "signal".into())
                     ))?;
 
-                    let clean_hibernate = hibernate_outcome.is_some();
+                    let clean_hibernate = hibernate_outcome.is_some()
+                        && (!self.research_notifications()
+                            || (exit_code == Some(0)
+                                && hibernate_outcome
+                                    .as_ref()
+                                    .is_some_and(|outcome| !outcome.is_crash())));
                     let decision = resolve_child_exit(hibernate_outcome.take(), elapsed, exit_code);
                     if decision.quick_exit {
                         let elapsed_s = format!("{:.1}s", elapsed.as_secs_f32());
@@ -1832,13 +1895,16 @@ impl Daemon {
                         )?;
                         outcome = outcome.without_retry();
                     }
-                    let suppress_missing_outbound = context.retry_remaining
-                        && outcome.is_retryable()
-                        && !inbox_state.has_claimed_batch()
-                        && !inbox_state.has_agent_outbound_message();
+                    let suppress_missing_outbound = (self.research_notifications()
+                        && exit_code == Some(0)
+                        && !outcome.is_crash())
+                        || (context.retry_remaining
+                            && outcome.is_retryable()
+                            && !inbox_state.has_claimed_batch()
+                            && !inbox_state.has_agent_outbound_message());
                     if suppress_missing_outbound {
                         logger.log_event(
-                            "daemon reply deferred: retryable agent failure, retry remains",
+                            "routine fallback suppressed: quiet research wake or bounded pending retry",
                         )?;
                     }
                     self.finalize_human_replies(
