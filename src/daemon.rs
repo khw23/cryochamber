@@ -1420,8 +1420,7 @@ impl Daemon {
                 }
             }
             DaemonRequest::Progress { text } => {
-                // A claimed human message is never rate limited or marked answered
-                // by a suppressed progress update: make the agent use `send`.
+                // Keep explicit human replies on send; progress is agent-initiated.
                 if state.inbox_state.has_claimed_batch() {
                     runtime.respond(
                         false,
@@ -1429,23 +1428,10 @@ impl Daemon {
                             .into(),
                     )?;
                 } else {
-                    let config =
-                        crate::config::load_config(&crate::config::config_path(&self.dir))?
-                            .unwrap_or_default();
-                    let path = self.dir.join(".cryo/progress-state.json");
-                    let mut progress = crate::progress::ProgressState::load(&path)?;
                     let now = self.clock.local_now();
-                    if progress.due(now, config.progress_interval_secs, &text) {
-                        effects.write_reply(ReplyAuthor::Agent, &text, now, false)?;
-                        state.inbox_state.record_status_send();
-                        progress.delivered(now, text);
-                        progress.save(&path)?;
-                        runtime.respond(true, "Progress sent".into())?;
-                    } else {
-                        progress.pending = Some(text);
-                        progress.save(&path)?;
-                        runtime.respond(true, "Progress NOT sent: coalesced locally. Revise your synthesis and call progress after the interval; no timer was created.".into())?;
-                    }
+                    effects.write_reply(ReplyAuthor::Agent, &text, now, false)?;
+                    state.inbox_state.record_status_send();
+                    runtime.respond(true, "Progress sent".into())?;
                 }
             }
             DaemonRequest::Ping => {

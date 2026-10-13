@@ -85,7 +85,7 @@ developer notes live in [`console/README.md`](console/README.md).
 
 ## Personal research fork
 
-Branch `research/quiet-progress` adds opt-in quiet successful wakes, rate-limited
-scientific syntheses and an explicit blocked-dispatch pause. Defaults remain
+Branch `research/event-progress` adds opt-in quiet successful wakes, immediate
+scientific stage reports (no daily quota/cooldown) and an explicit blocked-dispatch pause. Defaults remain
 upstream-compatible; see [research notifications](docs/src/explanation/research-notifications.md)
 before deployment. This branch is not an upstream release.

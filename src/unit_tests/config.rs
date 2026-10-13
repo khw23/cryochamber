@@ -1,6 +1,15 @@
 use super::*;
 
 #[test]
+fn legacy_progress_interval_is_read_but_not_written_or_defaulted() {
+    let config: CryoConfig = toml::from_str("progress_interval_secs = 86400").unwrap();
+    assert_eq!(config.progress_interval_secs, 86400);
+    assert!(!toml::to_string(&config)
+        .unwrap()
+        .contains("progress_interval_secs"));
+}
+
+#[test]
 fn test_load_malformed_toml() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("cryo.toml");
@@ -17,7 +26,7 @@ fn test_load_partial_toml() {
     let config = load_config(&path).unwrap().unwrap();
     assert_eq!(config.agent, "claude");
     assert!(!config.research_notifications);
-    assert_eq!(config.progress_interval_secs, 86400);
+    assert_eq!(config.progress_interval_secs, 0);
     assert_eq!(
         config.max_session_duration, 3600,
         "Should use default timeout"

@@ -9,6 +9,32 @@ use std::{
     time::{Duration, Instant},
 };
 
+#[test]
+fn chamber_scaffold_preserves_existing_scientific_plan_and_notes() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path();
+    fs::write(
+        root.join("plan.md"),
+        "Compare competing scientific explanations.",
+    )
+    .unwrap();
+    fs::write(
+        root.join("NOTES.md"),
+        "Current evidence is insufficient; keep the counterexample.",
+    )
+    .unwrap();
+    let report = cryochamber::protocol::scaffold_chamber(root, "/bin/true").unwrap();
+    assert!(!report.plan_created && !report.notes_created);
+    assert_eq!(
+        fs::read_to_string(root.join("plan.md")).unwrap(),
+        "Compare competing scientific explanations."
+    );
+    assert_eq!(
+        fs::read_to_string(root.join("NOTES.md")).unwrap(),
+        "Current evidence is insufficient; keep the counterexample."
+    );
+}
+
 fn run_daemon(root: &std::path::Path, registry: &std::path::Path) {
     let mut child = Command::new(env!("CARGO_BIN_EXE_cryo"))
         .arg("daemon")
@@ -69,12 +95,20 @@ printf '%s\n' 'Updated synthetic interpretation' | "$TEST_CRYO_AGENT" progress -
     let config = CryoConfig {
         agent: "/bin/sh ./mock.sh".into(),
         research_notifications: true,
+        progress_interval_secs: 86400, // Deprecated input must not throttle.
         max_session_duration: 10,
         watch_dirs: vec![],
         ..CryoConfig::default()
     };
     save_config(&config_path(root), &config).unwrap();
     let prepared = cryochamber::lifecycle::prepare_start(root, Default::default()).unwrap();
+    // A stale (even invalid) old queue is neither replayed nor a delivery blocker.
+    fs::create_dir_all(root.join(".cryo")).unwrap();
+    fs::write(
+        root.join(".cryo/progress-state.json"),
+        "obsolete queue evidence",
+    )
+    .unwrap();
     cryochamber::state::save_state(&cryochamber::state::state_path(root), &prepared.state).unwrap();
     let todos = TodoFile::new(root.join("todo.json"));
     todos
@@ -86,16 +120,19 @@ printf '%s\n' 'Updated synthetic interpretation' | "$TEST_CRYO_AGENT" progress -
     assert!(items[0].done && !items[0].claimed);
     assert!(!items[1].done && !items[1].claimed);
     assert_eq!(items[1].text, "Preserve scientific task");
-    let progress =
-        cryochamber::progress::ProgressState::load(&root.join(".cryo/progress-state.json"))
-            .unwrap();
     assert_eq!(
-        progress.pending.as_deref(),
-        Some("Updated synthetic interpretation\n")
+        fs::read_to_string(root.join(".cryo/progress-state.json")).unwrap(),
+        "obsolete queue evidence"
     );
     let before = cryochamber::message::read_outbox(root).unwrap();
-    // Clock-independent: quiet hours send none; daytime sends only the first.
-    assert!(before.len() <= 1);
+    // Both results arrive immediately, independently of time of day.
+    assert_eq!(before.len(), 2);
+    assert!(before
+        .iter()
+        .any(|(_, m)| m.body.contains("What the synthetic result means")));
+    assert!(before
+        .iter()
+        .any(|(_, m)| m.body.contains("Updated synthetic interpretation")));
     assert!(before.iter().all(|(_, m)| m.from == "agent"));
     let state: serde_json::Value =
         serde_json::from_slice(&fs::read(root.join("timer.json")).unwrap()).unwrap();

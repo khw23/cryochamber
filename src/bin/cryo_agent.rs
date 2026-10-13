@@ -16,7 +16,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Rate-limited ordinary progress; use send for human replies or important events
+    /// Immediately deliver a scientific synthesis; use send for human replies
     Progress {
         #[arg(required_unless_present = "stdin", conflicts_with = "stdin")]
         text: Option<String>,

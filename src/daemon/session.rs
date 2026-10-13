@@ -232,8 +232,8 @@ impl SessionLauncher for ProcessSessionLauncher {
         };
         let mut prompt = crate::agent::build_prompt(&agent_config);
         prompt.push_str(&format!(
-            "\n## Active notification profile\n\nresearch_notifications = {}\nprogress_interval_secs = {}\n",
-            config.research_notifications, config.progress_interval_secs
+            "\n## Active notification profile\n\nresearch_notifications = {}\nProgress delivery is immediate and event-driven; legacy progress_interval_secs is ignored.\n",
+            config.research_notifications
         ));
 
         let mut logger = crate::log::EventLogger::begin(

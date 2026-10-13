@@ -9,12 +9,12 @@ Default profile: every session sends at least one human-visible outbox message, 
 ## Research profile (only when `research_notifications = true` in cryo.toml)
 
 - Continue useful ready work in one session; hibernate for real waits, not each small command. Silence on an unchanged successful wake is allowed. The daemon does not invent a routine status message. Real failures and unanswered claimed human messages still receive fallbacks.
-- Before sending ordinary progress, synthesize what question this work serves, what you did, what the result means and cannot establish, and the next discriminating test. Use plain language, explain internal terms, and keep logs/hashes in files. Use `cryo-agent progress --stdin` for this synthesis. Delivery is limited to once per `progress_interval_secs` (default 86400) and local 08:00–22:00; unchanged text is suppressed. This is not an automatic daily-report scheduler.
-- Suppressed progress is saved locally, NOT sent. Keep the full interpretation in the research report. At a later genuine wake, revise the synthesis from current evidence and call `progress` again; do not replay stale pending text or schedule wakeups merely to announce that nothing changed.
-- Use `cryo-agent send` for replies to people, consequential scientific corrections, major findings, real blockers and urgent risks. Do not use it to bypass the ordinary progress limit. A claimed inbox batch must be answered with `send`; `progress` never satisfies that obligation.
+- When a scientific stage yields an interpretable result, a useful negative finding or a consequential correction, report it promptly. Before sending, explain what question this serves, why the method helps, what the result means and cannot establish, and the next discriminating test. Use plain language, explain necessary terms, and leave logs/hashes in files. `cryo-agent progress --stdin` delivers your synthesis immediately: no cooldown, daily quota, default quiet hours, or pending queue. Two meaningful results an hour apart may deserve two messages. Combine micro-steps, not independent scientific results. Do not schedule wakes just to produce messages.
+- The daemon does not judge scientific significance, rewrite text, or guarantee correctness. You decide what merits reporting. Unchanged routine checks remain silent; do not forward your work log. Explicit user notification preferences in plan.md still apply; do not invent nighttime restrictions or morning stopping points.
+- Use `cryo-agent send` for replies to people and urgent risks (also valid for scientific results). A claimed inbox batch must be answered with `send`; `progress` never satisfies that obligation. Failures and meaningful corrections must not be hidden by a quiet-work convention.
 - If only waiting for the human and no useful timed work remains, plain `hibernate` may leave no TODO and await inbox activity. This is not research completion. For a real computation wait, schedule an appropriate TODO; no TODO means no timed follow-up.
 - For a blocked runner or an explicitly requested takeover, `cryo-agent pause --summary "reason"` is a terminal action: finish replying to mail, call it and exit successfully. Dispatch stops; the research is NOT marked complete. Claimed unfinished TODO intent is preserved under new IDs, other TODOs and external calculations remain unchanged. An operator must explicitly restart the chamber. Do not use pause for ordinary sleeps or quota resets with a known time.
-- Project CURRENT.md owns the scientific state. NOTES.md may hold unique chamber-specific operational facts, not a second scientific diary. Read the project's current context each wake.
+- Read plan.md as the actual scientific plan and NOTES.md as current scientific understanding, not merely file routers. If PROJECT.md exists, use it for the long-term question/background/evidence standard. Replace stale understanding; preserve evidence links and reasons for consequential changes, not a growing diary. Existing projects with an explicitly configured legacy context packet keep that layout until reviewed migration; do not maintain both sets in parallel.
 
 ## Session Workflow
 
@@ -58,7 +58,7 @@ Append to `NOTES.md` only when this session produced something future-you cannot
 
 - A durable fact about the project, the human, or the world. → `## Project facts`
 - A hypothesis or open question you want to revisit. → `## Open questions / hypotheses`
-- A multi-session plan that won't fit on a TODO line. → `## Plans in flight`
+- A multi-session plan that won't fit on a TODO line. → `## Plans in flight`. In the research profile keep the actual scientific plan in plan.md; NOTES records current understanding and links to that plan rather than duplicating it.
 - A decision and *why* you made it (over the alternatives considered).
 - **Friction:** anything about cryochamber tools or this protocol that surprised you, didn't work as expected, or made the right action unclear (a `cryo-agent` flag that rejected your input, an ambiguous prompt section hint, a step where you almost took a wrong shortcut). → `## Friction log`. This is how the protocol gets fixed — silent friction is lost.
 
@@ -124,7 +124,7 @@ If you exit without calling `cryo-agent hibernate`, the daemon may retry transie
 
 ```
 cryo-agent send "message"                                        # Send message to human (outbox)
-cryo-agent progress --stdin                                     # Synthesized ordinary research progress; may be coalesced, not sent
+cryo-agent progress --stdin                                     # Deliver an agent-authored scientific synthesis immediately
 cryo-agent pause --summary "reason"                              # Stop dispatch, preserve unfinished work; explicit restart required
 cat <<'EOF' | cryo-agent send --stdin                            # Safe for multi-line/shell-sensitive text
 message

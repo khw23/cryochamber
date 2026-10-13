@@ -1499,6 +1499,7 @@ fn research_profile_quiet_waits_progress_human_replies_and_pause() {
     for scenario in [
         "quiet",
         "progress",
+        "progress-night",
         "reply",
         "unanswered",
         "crash",
@@ -1508,10 +1509,17 @@ fn research_profile_quiet_waits_progress_human_replies_and_pause() {
         let dir = tempfile::tempdir().unwrap();
         let config = CryoConfig {
             research_notifications: true,
+            progress_interval_secs: 86400, // Old config must not keep suppressing results.
             ..CryoConfig::default()
         };
         crate::config::save_config(&crate::config::config_path(dir.path()), &config).unwrap();
-        let now = "2026-10-11T12:00:00".parse().unwrap();
+        let now = if scenario == "progress-night" {
+            "2026-10-11T23:00:00"
+        } else {
+            "2026-10-11T12:00:00"
+        }
+        .parse()
+        .unwrap();
         let clock = Arc::new(TestClock::new(now));
         let daemon = Daemon::new_with_clock(dir.path().to_path_buf(), clock.clone());
         let state = test_cryo_state();
@@ -1523,7 +1531,7 @@ fn research_profile_quiet_waits_progress_human_replies_and_pause() {
         };
         let mut effects = FakeSessionEffects::new(); // No pending TODO: research idle is valid.
         let requests = match scenario {
-            "progress" => vec![
+            "progress" | "progress-night" => vec![
                 Request::Progress {
                     text: "Scientific interpretation".into(),
                 },
@@ -1590,15 +1598,12 @@ fn research_profile_quiet_waits_progress_human_replies_and_pause() {
                 assert_eq!(outcome, SessionLoopOutcome::Hibernate);
                 assert!(effects.replies.is_empty());
             }
-            "progress" => {
-                assert_eq!(effects.replies.len(), 1);
+            "progress" | "progress-night" => {
+                assert_eq!(effects.replies.len(), 2);
                 assert_eq!(effects.replies[0].1, "Scientific interpretation");
-                let progress = crate::progress::ProgressState::load(
-                    &dir.path().join(".cryo/progress-state.json"),
-                )
-                .unwrap();
-                assert_eq!(progress.pending.as_deref(), Some("Later interpretation"));
-                assert!(runtime.responses()[1].1.contains("NOT sent"));
+                assert_eq!(effects.replies[1].1, "Later interpretation");
+                assert!(runtime.responses()[1].1.contains("Progress sent"));
+                assert!(!dir.path().join(".cryo/progress-state.json").exists());
             }
             "reply" => {
                 assert!(!runtime.responses()[1].0);
