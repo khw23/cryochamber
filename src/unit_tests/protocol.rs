@@ -1,6 +1,24 @@
 use super::*;
 
 #[test]
+fn research_briefing_is_embedded_with_incident_and_safe_boundary_contract() {
+    let briefing = include_str!("../../templates/research-briefing.md");
+    assert!(PROTOCOL_CONTENT.contains(briefing));
+    for phrase in [
+        "适用于 research_notifications",
+        "阶段报告：像研究生向导师汇报",
+        "节点明显变慢",
+        "即使暂时还在排查",
+        "自然安全边界",
+        "同一异常的零碎诊断",
+    ] {
+        assert!(briefing.contains(phrase), "missing {phrase}");
+    }
+    assert!(!PROTOCOL_CONTENT.contains("Two meaningful results an hour apart"));
+    assert!(PROTOCOL_CONTENT.contains("Default profile: every session"));
+}
+
+#[test]
 fn write_file_if_missing_writes_new_file() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("example.txt");

@@ -4,7 +4,11 @@ use std::path::Path;
 
 /// Protocol content embedded into every runtime agent prompt.
 /// Source: templates/protocol.md
-pub const PROTOCOL_CONTENT: &str = include_str!("../templates/protocol.md");
+pub const PROTOCOL_CONTENT: &str = concat!(
+    include_str!("../templates/protocol.md"),
+    "\n\n",
+    include_str!("../templates/research-briefing.md")
+);
 
 /// Template plan written by `cryo init` if no plan.md exists.
 /// Source: templates/plan.md

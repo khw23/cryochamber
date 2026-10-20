@@ -10,6 +10,10 @@ For project overview and usage, see `README.md`.
 ### Research fork contract
 
 See `templates/protocol.md` and `docs/src/explanation/research-notifications.md`.
+The embedded `templates/research-briefing.md` provides the reusable stage/incident
+message template, mirrored in research-agent-config. Normal reports combine a
+research stage; material slowdown alerts remain immediate. Ordinary mail may wait
+for a natural task boundary. Do not add time quotas or forced inbox preemption.
 The default upstream reporting/TODO contract remains unchanged. With opt-in
 `research_notifications`, clean unchanged wakes may be silent and idle without
 a TODO; real failure and claimed-human-message fallback guarantees remain.

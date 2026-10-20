@@ -1,6 +1,6 @@
 # Event-driven research reporting (personal fork)
 
-Version 0.2.8-research.2, branch `research/event-progress`. This is not an
+Version 0.2.8-research.3, branch `research/event-progress`. This is not an
 upstream release or a replacement model. It cannot guarantee scientific quality.
 
 Set top-level `research_notifications = true` in the chamber's `cryo.toml`.
@@ -8,15 +8,22 @@ Other chambers retain the upstream per-wake fallback/TODO defaults.
 Use matching binaries and restart the daemon deliberately at a safe boundary.
 IPC v11 rejects v10 clients; v11 alone does not distinguish research.1 from
 research.2, so check the build/version as well. Updating a runner or source checkout
-does not update the daemon already running.
+does not update the daemon already running. research.3 embeds the stage/incident
+briefing template without changing IPC, notification transport or scheduling.
 
 ## What gets sent
 
-The agent interprets its results and writes a scientific explanation:
+The reusable message template is `templates/research-briefing.md`, embedded into
+every runtime prompt by `src/protocol.rs` (active only in research mode). It is
+kept byte-equivalent to research-agent-config's
+`templates/research-project/ZULIP_BRIEFING.md`; update and compare both when
+changing the shared reporting contract. No per-project prompting is required.
+
+The agent interprets a coherent stage and writes a scientific explanation:
 the question, why this method helps, the result's meaning and limits, the next
 useful test. Use `cryo-agent progress --stdin` for that synthesis. It sends
 immediately, including at night: no interval, daily quota, count limit, exact-text
-filter or pending queue. Two valuable stages in two hours can produce two reports.
+filter or pending queue. At most about one page is a ceiling, not a length target.
 Combine commands and intermediate checks into their scientific result, not whole
 days of results into one message. A useful negative result is progress too.
 
@@ -24,7 +31,13 @@ No result/change means no unsolicited message. The daemon cannot judge scientifi
 significance and does not rewrite messages. Explicit user quiet-hour preferences
 belong in the project plan; there is no default nighttime embargo.
 
-Use `send` for direct human replies and urgent alerts (it can also carry results).
+Use `send` for direct human replies and operational alerts. Material node slowdown
+may be reported while investigating, without waiting for a decision or a stage
+report. Keep subsequent diagnostic micro-steps in notes/logs; send another update
+for meaningful impact, resolution or a needed decision, not every command.
+Ordinary mail may wait for a natural safe boundary; it need not interrupt running
+computation. Do not narrate routine session switches. No forced inbox preemption,
+new message classifier, timer, count gate or approval loop is introduced.
 A received batch must be answered with `send`; `progress` refuses while such a
 reply is owed. Missing replies and actual crashes retain fallback handling.
 Successful unchanged wakes may stay silent.

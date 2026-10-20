@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Personal research fork 0.2.8-research.3
+
+- Embed a reusable stage/incident briefing template and align the research
+  protocol: coherent stage reports, timely node-slowdown alerts, consolidated
+  incident follow-ups, and natural-boundary handling of ordinary human mail.
+- No time/count gates, inbox preemption, IPC or scheduling changes. Default
+  non-research chambers retain their contract. Existing daemons need a separately
+  coordinated paired upgrade; this source change does not restart any chamber.
+
 Security and reliability hardening.
 
 ### Cryohub
